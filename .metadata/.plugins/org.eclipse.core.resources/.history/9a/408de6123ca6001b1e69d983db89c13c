@@ -1,0 +1,46 @@
+package tsg.ttt.main.ui;
+
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
+import tsg.ttt.main.ui.UIObject;
+
+public class UIImage extends UIObject{ //Displays a simple image with limited interactions
+	
+	BufferedImage image;
+	private boolean doRot = false;
+	private double rotC = 0;
+	
+	public UIImage(float x, float y, int width, int height, BufferedImage image) {
+		super(x, y, width, height, false);
+		this.image = image;
+	}
+
+	public void tick() {}
+
+	public void render(Graphics g) {
+		if (doRot) {
+			rotC+=0.01;
+			Graphics2D g2d = (Graphics2D) g;
+			AffineTransform backup = g2d.getTransform();
+			AffineTransform trans = new AffineTransform();
+			trans.rotate(rotC, x+width/2, y+height/2);
+			g2d.transform(trans);
+			g.drawImage(image, (int) x, (int) y, width, height, null);
+			g2d.setTransform(backup); 
+		} else {
+			g.drawImage(image, (int) x, (int) y, width, height, null);
+		}
+	}
+
+	public void onClick() {}
+	
+	public void doRot() {
+		doRot = true;
+	}
+	
+	public void stopRot() {
+		doRot = false;
+	}
+}

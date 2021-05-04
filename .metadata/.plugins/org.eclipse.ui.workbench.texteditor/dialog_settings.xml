@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="org.eclipse.ui.texteditor.GotoLineAction$GotoLineDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="221"/>
+		<item key="DIALOG_Y_ORIGIN" value="259"/>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
+		<item key="isRegEx" value="false"/>
+		<item key="selection" value="coin"/>
+		<item key="casesensitive" value="false"/>
+		<item key="incremental" value="true"/>
+		<item key="wrap" value="true"/>
+		<item key="wholeword" value="false"/>
+		<list key="findhistory">
+			<item value="coin"/>
+			<item value="*100000"/>
+			<item value="getgold"/>
+			<item value="getcoins"/>
+			<item value="coins"/>
+			<item value="leftPressed"/>
+			<item value="RED"/>
+			<item value="emptychance"/>
+			<item value="level"/>
+			<item value="points"/>
+			<item value="score"/>
+			<item value="scorem"/>
+			<item value="digitsC"/>
+			<item value="33"/>
+			<item value="scoremi"/>
+		</list>
+		<list key="replacehistory">
+			<item value="BasicBrick"/>
+			<item value=""/>
+			<item value="box"/>
+			<item value="bombCooldown"/>
+			<item value="bombRadius*2"/>
+			<item value="bombRadius"/>
+			<item value="ballW"/>
+			<item value="speed"/>
+			<item value="ballWidth"/>
+			<item value=" "/>
+			<item value="activeAnim"/>
+			<item value="activeSkin"/>
+			<item value="4  "/>
+			<item value="3"/>
+			<item value="3  "/>
+		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item key="DIALOG_WIDTH" value="284"/>
+		<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|0|0|Segoe UI"/>
+		<item key="DIALOG_HEIGHT" value="391"/>
+		<item key="DIALOG_X_ORIGIN" value="1204"/>
+		<item key="DIALOG_Y_ORIGIN" value="91"/>
+	</section>
+</section>

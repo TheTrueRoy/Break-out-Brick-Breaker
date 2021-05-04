@@ -1,0 +1,239 @@
+package tsg.ttt.main;
+
+import java.awt.Color;
+
+import java.awt.Graphics;
+import java.awt.image.BufferStrategy;
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URISyntaxException;
+
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.UnsupportedAudioFileException;
+
+import tsg.ttt.main.control.keyboard.KeyManager;
+import tsg.ttt.main.control.mouse.MouseManager;
+import tsg.ttt.main.display.Display;
+import tsg.ttt.main.gfx.Assets;
+import tsg.ttt.main.states.GameState;
+import tsg.ttt.main.states.InstructionState;
+import tsg.ttt.main.states.MenuState;
+import tsg.ttt.main.states.SettingState;
+import tsg.ttt.main.states.State;
+
+public class Game implements Runnable {
+	
+	private Display display;
+	private int width, height;
+	public String title;
+	
+	private boolean running = false;
+	private static boolean darkMode = false, wasDarkMode = darkMode;
+	private Thread thread;
+	
+	private BufferStrategy bs;
+	private Graphics g;
+	
+	//States 
+	public State gameState;
+	public State menuState;
+	public State instructionState;
+	public State settingState;
+	
+	//Input
+	private KeyManager keyManager;
+	private MouseManager mouseManager;
+	
+	private Handler handler;
+	
+	public Game(String title, int width, int height) {
+		this.width = width;
+		this.height = height;
+		this.title = title;
+		keyManager = new KeyManager();
+		mouseManager = new MouseManager();
+	}
+	
+	Long currentFrame; 
+    Clip clip; 
+      
+    AudioInputStream audioInputStream; 
+	
+	private void init() {
+		FileReader isReader;
+		try {
+			isReader = new FileReader("preferences.txt");
+			BufferedReader br = new BufferedReader(isReader);
+		    String Bs;
+		    try {
+		    	while( (Bs=br.readLine()) != null ){
+					if (Bs == "true")
+						darkMode = true;
+					else if (Bs == "false")
+						darkMode = false;
+				}
+		    	br.close();
+		} catch (FileNotFoundException e3) {
+			// TODO Auto-generated catch block
+			e3.printStackTrace();
+		}
+		} catch (IOException e2) {
+			e2.printStackTrace();
+		}
+		try {
+			InputStream bufferedIn = new BufferedInputStream(Game.class.getResourceAsStream("/sounds/song.wav"));
+			audioInputStream = AudioSystem.getAudioInputStream(bufferedIn);
+		} catch (UnsupportedAudioFileException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} 
+        try {
+			clip = AudioSystem.getClip();
+		} catch (LineUnavailableException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+        try {
+			clip.open(audioInputStream);
+		} catch (LineUnavailableException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+        clip.loop(Clip.LOOP_CONTINUOUSLY); 
+		display = new Display(title, width, height);
+		display.getFrame().addKeyListener(keyManager);
+		
+		display.getFrame().addMouseListener(mouseManager);
+		display.getFrame().addMouseMotionListener(mouseManager);
+		display.getCanvas().addMouseListener(mouseManager);
+		display.getCanvas().addMouseMotionListener(mouseManager);
+		
+		Assets.init();
+		
+		handler = new Handler(this);
+		
+		gameState = new GameState(handler);
+		menuState = new MenuState(handler);
+		settingState = new SettingState(handler);
+		instructionState = new InstructionState(handler);
+		
+		State.setState(menuState);
+	}
+
+	private void tick() {
+		
+		keyManager.tick();
+		if(State.getState() != null) {
+			State.getState().tick();
+		}
+		if(wasDarkMode != darkMode) {
+			Assets.init();
+			State.getState().init();
+		}
+		wasDarkMode = darkMode;
+	}
+	
+	private void render() {
+		bs = display.getCanvas().getBufferStrategy();
+		if(bs == null) {
+			display.getCanvas().createBufferStrategy(3);
+			return;
+		}
+		g = bs.getDrawGraphics();
+		g.clearRect(0, 0, width, height);
+		if (!darkMode)
+			g.setColor(Color.WHITE);
+		else 
+			g.setColor(Color.BLACK);
+		g.fillRect(0, 0, width, height);
+		if(State.getState() != null) {
+			State.getState().render(g);
+		}
+		
+		//End of Zone!
+		bs.show();
+		g.dispose();
+	}
+	
+	public static boolean isDarkMode() {
+		return darkMode;
+	}
+
+	public void setDarkMode(boolean darkMode) {
+		Game.darkMode = darkMode;
+	}
+
+	public void run() {
+
+		init();
+		
+		double timePerTick = 1000000000/60;
+		double delta = 0;
+		long now;
+		long lastTime = System.nanoTime();
+		
+		while(running) {
+			now = System.nanoTime();
+			delta += (now - lastTime) / timePerTick;
+			lastTime = now;
+			
+			if (delta > 1) {
+				tick();
+				render();
+				delta--;
+			}
+		}
+		
+		stop();
+		
+	}
+	
+	public KeyManager getKeyManager() {
+		return keyManager;
+	}
+	
+	public MouseManager getMouseManager() {
+		return mouseManager;
+	}
+
+	public int getWidth() {
+		return width;
+	}
+	
+	public int getHeight() {
+		return height;
+	}
+	
+	public synchronized void start() {
+		if (running)
+			return;
+		running = true;
+		thread = new Thread(this);
+		thread.start();
+	}
+	public synchronized void stop() {
+		if (!running)
+			return;
+		try {
+			thread.join();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+}

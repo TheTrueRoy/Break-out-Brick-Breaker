@@ -1,0 +1,163 @@
+package tsg.ttt.main.states;
+
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.image.BufferedImage;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+import tsg.ttt.main.Game;
+import tsg.ttt.main.Handler;
+import tsg.ttt.main.control.keyboard.KeyManager;
+import tsg.ttt.main.gfx.Assets;
+import tsg.ttt.main.ui.*;
+import tsg.ttt.main.ui.particles.blackParticle;
+import tsg.ttt.main.ui.particles.coinParticle;
+import tsg.ttt.main.ui.particles.explosionParticle;
+import tsg.ttt.main.ui.particles.greenParticle;
+import tsg.ttt.main.ui.particles.greenParticleVortex;
+import tsg.ttt.main.ui.particles.laserBeam;
+import tsg.ttt.main.utils.GoodPlayer;
+
+public class BrickState extends State{
+	
+	private UIManager uiManager;
+	Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+	KeyManager keyManager = handler.getKeyManager();
+	int timeEsc = 0;
+
+	ArrayList<UIImage> bricks = new ArrayList<UIImage>();
+	
+	UIImage paddle;
+	int paddleX = 0, paddleW = 400, paddleH = 100;
+	Rectangle pBounds = new Rectangle(0,screenSize.height-paddleH,paddleW,paddleH);
+	
+	UIImage paddle2;
+	Rectangle pBounds2 = new Rectangle(0,screenSize.height-paddleH,paddleW,paddleH);
+	
+	UIImage ball;
+	double ballD, ballX, ballY, ballVX, ballVY; 
+	int ballW = 50, speed = 10*(Game.getDifficulty()+1), paddleSpeed = 10;
+	Rectangle bBounds = new Rectangle(0,0,ballW,ballW);
+	
+	public BrickState(Handler handler) {
+		super(handler);
+		init();
+	}
+	
+	public void init() {
+		speed = 5*(Game.getDifficulty()+1);
+		ballD = Math.random()*90+45;
+		ballD = Math.toRadians(ballD);
+		ballX = screenSize.width/2; ballY = screenSize.height/2; ballVX = Math.cos(ballD)*3; ballVY = Math.sin(ballD)*3;
+		timeEsc = 0;
+		uiManager = new UIManager(handler);
+		handler.getMouseManager().setUIManager(uiManager);
+		paddle = new UIImage(screenSize.width/2, screenSize.height-paddleH, paddleW, paddleH, Assets.playAgain[0]);
+		paddle2 = new UIImage(screenSize.width*3/2, screenSize.height-paddleH, paddleW, paddleH, Assets.playAgain[0]);
+		ball = new UIImage((int)ballX, (int)ballY, ballW, ballW, Assets.o);
+		uiManager.addObject(paddle);
+		uiManager.addObject(paddle2);
+		uiManager.addObject(ball);
+		
+		for(int i = 0; i < 2; i++) {
+			for(int j = 0; j < 10; j++) {
+				UIImage brick = new UIImage(j*80+360+40*(i%2),i*60+200,80,60,Assets.bricks[(int)(Math.random()*10)]);
+				bricks.add(brick);
+				uiManager.addObject(brick);
+			}
+		}
+	}
+	
+	public void tick() {
+		//Most of the games code
+		if (keyManager.right == true) { 
+			paddle.setX(paddle.getX()+paddleSpeed);
+		}
+		
+		if (keyManager.left == true) { 
+			paddle.setX(paddle.getX()-paddleSpeed);
+		}
+		if (keyManager.esc == true) { 
+			State.setState(handler.getGame().menuState);
+		}
+		
+		//Trippy side portal nonsense
+		if (paddle.getX() > screenSize.width)//Moves primary paddle to replace clone on left
+			paddle.setX(paddle.getX()-screenSize.width);
+		if (paddle.getX() < 0)//Moves primary paddle to replace clone on right
+			paddle.setX(paddle.getX()+screenSize.width);
+		
+		//Moves clone to the side more likely to require it next as well as removing it after teleportation
+		if (paddle.getX() < screenSize.width/2) {
+			paddle2.setX(paddle.getX()+screenSize.width);
+		} else {
+			paddle2.setX(paddle.getX()-screenSize.width);
+		}
+		
+		pBounds.x = (int) paddle.getX();
+		pBounds2.x = (int) paddle2.getX();
+		bBounds.x = (int) ball.getX();
+		bBounds.y = (int) ball.getY();
+		if (pBounds.intersects(bBounds) || pBounds2.intersects(bBounds)) {
+			if (bBounds.y > pBounds.y-ballW/2+ballVY*2) { //If it blatantly hits the side of the paddle, it bounces of the side
+				ballD = Math.PI-ballD + Math.random()*0.6-0.3;
+				if (keyManager.left == true) {
+					ballVX = Math.cos(ballD)*speed-paddleSpeed-1; ballVY = Math.sin(ballD)*speed;
+				} else {
+					ballVX = Math.cos(ballD)*speed+paddleSpeed+1; ballVY = Math.sin(ballD)*speed;
+				}
+			} else { //It hits the top/near the top, it bounces back
+				ballD = -ballD + Math.random()*0.6-0.3;
+				ballVX = Math.cos(ballD)*speed; ballVY = Math.sin(ballD)*speed;
+			}
+		}
+		if (ball.getY() > screenSize.height-ballW) {
+			State.setState(handler.getGame().menuState);
+		} else if (ball.getY() < 0) {
+			ball.setY(0);
+			ballD = -ballD + Math.random()*0.6-0.3;
+			ballVX = Math.cos(ballD)*speed; ballVY = Math.sin(ballD)*speed;
+		}
+		if (ball.getX() > screenSize.width-ballW) {
+			ball.setX(screenSize.width-ballW);
+			ballD = Math.PI-ballD + Math.random()*0.6-0.3;
+			ballVX = Math.cos(ballD)*speed; ballVY = Math.sin(ballD)*speed;
+		} else if (ball.getX() < 0) {
+			ball.setX(0);
+			ballD = Math.PI-ballD + Math.random()*0.6-0.3;
+			ballVX = Math.cos(ballD)*speed; ballVY = Math.sin(ballD)*speed;
+		}
+		System.out.println(ballD + "," + Math.sqrt(Math.pow(ballVX,2) + Math.pow(ballVY,2)));
+		ball.setX((float)(ball.getX()+ballVX));
+		ball.setY((float)(ball.getY()+ballVY));
+		
+		Iterator<UIImage> it = bricks.iterator();
+		while(it.hasNext()) {
+			UIImage e = it.next();
+			Rectangle r = new Rectangle((int)e.getX(), (int)e.getY(), e.getWidth(), e.getHeight());
+			if (r.intersects(bBounds)) {
+				if (bBounds.y < r.y+ballW*2/3 || bBounds.y+bBounds.height > r.y - ballW*2/3) { //If it blatantly hits the side of the brick, it bounces of the side
+					ballD = Math.PI-ballD + Math.random()*0.6-0.3;
+				} else { //It hits the top/near the top, it bounces back
+					ballD = -ballD + Math.random()*0.6-0.3;
+					ballVX = Math.cos(ballD)*speed; ballVY = Math.sin(ballD)*speed;
+				}
+				bricks.remove(e);
+				e.setActive(false);
+			}
+		}
+		//Ticks the UI
+		uiManager.tick();
+	}
+
+	public void render(Graphics g) { //Renders everything
+		uiManager.render(g);
+	}
+}

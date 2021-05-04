@@ -1,0 +1,13 @@
+package tsg.ttt.main;
+
+import java.awt.Dimension;
+import java.awt.Toolkit;
+
+public class Launcher {
+	public static void main(String[] args) {
+		//Launches the game by starting a Game Class
+		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+		Game ttt = new Game("Tic, Tac, Toe!", screenSize.width, screenSize.height);
+		ttt.start();
+	}
+}

@@ -1,0 +1,127 @@
+package tsg.ttt.main.states;
+
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Toolkit;
+import java.io.FileWriter;
+import java.io.IOException;
+
+import tsg.ttt.main.Game;
+import tsg.ttt.main.Handler;
+import tsg.ttt.main.gfx.Assets;
+import tsg.ttt.main.ui.ClickListener;
+import tsg.ttt.main.ui.UIImage;
+import tsg.ttt.main.ui.UIImageButton;
+import tsg.ttt.main.ui.UIManager;
+import tsg.ttt.main.ui.UITiltImage;
+import tsg.ttt.main.ui.particles.blackParticle;
+
+public class MenuState extends State{
+	
+	private UIManager uiManager;
+	private int time = 0;
+	Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+	
+	public MenuState(Handler handler) {
+		super(handler);
+		init();
+	}
+
+	public void init() {
+		FileWriter writer;
+		try {
+			writer = new FileWriter("docs/userdata.txt", false);
+			writer.write(Integer.toString(Game.getGold())+"\n");
+			for (int i = 0; i < 8; i++) 
+				writer.write(Boolean.toString(Game.getPurchases()[i])+"\n");
+			writer.write(Game.getActiveSkin()+"\n");
+			writer.write(Game.getActiveAnim()+"\n");
+		    writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		uiManager = new UIManager(handler);
+		handler.getMouseManager().setUIManager(uiManager);
+		//Displays THe coin in the upper right
+		UIImage coins = new UIImage(16, 16, 64, 64, Assets.coin);
+		uiManager.addObject(coins);
+		//Creates a bunch of buttons
+		UIImageButton twoplayer = new UIImageButton(screenSize.width/2+140, screenSize.height/10*6-36, 216, 72, Assets.p2, new ClickListener(){
+
+			public void onClick() {
+				handler.getMouseManager().setUIManager(null);
+				Game.setCpuActive(false);
+				State.setState(handler.getGame().gameState);
+			}}, true);
+		UIImageButton oneplayer = new UIImageButton(screenSize.width/2-356, screenSize.height/10*6-36, 216, 72, Assets.p1, new ClickListener(){
+
+			public void onClick() {
+				handler.getMouseManager().setUIManager(null);
+				Game.setCpuActive(true);
+				State.setState(handler.getGame().gameState);
+			}}, true);
+		oneplayer.setShown(false);
+		twoplayer.setShown(false);
+		uiManager.addObject(new UIImageButton(screenSize.width/2-(int)(108*1.1), screenSize.height/10*6-(int)(36*1.1), (int)(216*1.1), (int)(72*1.1), Assets.playButton, new ClickListener(){
+
+			public void onClick() {
+				oneplayer.setShown(!oneplayer.isShown());
+				twoplayer.setShown(!twoplayer.isShown());
+			}}, true));
+		uiManager.addObject(new UIImageButton(screenSize.width/2-324, screenSize.height/10*7-36, 648, 72, Assets.instructions, new ClickListener(){
+
+			public void onClick() {
+				State.setState(handler.getGame().instructionState);
+			}}, true));
+		uiManager.addObject(new UIImageButton(30, screenSize.height/20*19-36, 216, 72, Assets.shop, new ClickListener(){
+
+			public void onClick() {
+				State.setState(handler.getGame().shopState);
+			}}, true));
+		uiManager.addObject(new UIImageButton(screenSize.width-80, screenSize.height-80, 64, 64, Assets.settings, new ClickListener(){
+
+			public void onClick() {
+				SettingState.setLastState(handler.getGame().menuState);
+				handler.getMouseManager().setUIManager(null);
+				State.setState(handler.getGame().settingState);
+			}}, true));
+		uiManager.addObject(new UIImageButton(screenSize.width-80, 0, 64, 64, Assets.settings, new ClickListener(){
+
+			public void onClick() {
+				System.exit(0);
+			}}, true));
+		uiManager.addObject(oneplayer);
+		uiManager.addObject(twoplayer);
+		//Displays the title
+		uiManager.addObject(new UITiltImage(screenSize.width/2-500, screenSize.height/10*4-128/7*5, 1000, 128/7*10, Assets.title, 0.05, 0.00025));
+		//Creates Particles
+		for(int i  = 0; i < 50; i++){
+			uiManager.addObject(new blackParticle((float)Math.random()*screenSize.width, (float)Math.random()*screenSize.height/2+screenSize.height/2, (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f*0.3f, (float)Math.random()*1.3f*1.3f));
+		}
+	}
+	
+	public void tick() {
+		time++;
+		//Makes Ambiance and ticks the UI
+		if (time >= 3) {
+			uiManager.addObject(new blackParticle((float)Math.random()*screenSize.width, screenSize.height+100, (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f*0.3f, (float)Math.random()*1.3f*1.3f));
+			time = 0;
+		}
+		uiManager.tick();
+	}
+
+	public void render(Graphics g) {
+		//Renders the # of coins and then the rest of the UI
+		Font font = new Font("Serif", Font.PLAIN, 80);
+		g.setFont(font);
+		if(Game.isDarkMode())
+			g.setColor(Color.white);
+		else
+			g.setColor(Color.black);
+		g.drawString(Integer.toString(Game.getGold()), 94, 72);
+		uiManager.render(g);
+	}
+	
+}

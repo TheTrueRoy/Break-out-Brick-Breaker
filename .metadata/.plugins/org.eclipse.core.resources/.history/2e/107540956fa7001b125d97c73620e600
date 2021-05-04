@@ -1,0 +1,24 @@
+package tsg.ttt.main;
+
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Image;
+import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.image.MemoryImageSource;
+
+public class Launcher {
+	public static void main(String[] args) {
+		//Hides mouse
+		int[] pixels = new int[16 * 16];
+		Image image = Toolkit.getDefaultToolkit().createImage(
+		        new MemoryImageSource(16, 16, pixels, 0, 16));
+		Cursor transparentCursor =
+		        Toolkit.getDefaultToolkit().createCustomCursor
+		             (image, new Point(0, 0), "invisibleCursor");
+		//Launches the game by starting a Game Class
+		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+		Game ttt = new Game("Break-OUT", screenSize.width, screenSize.height);
+		ttt.start();
+	}
+}

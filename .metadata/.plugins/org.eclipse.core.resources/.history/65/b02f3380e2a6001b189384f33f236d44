@@ -1,0 +1,886 @@
+package tsg.ttt.main.states;
+
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Toolkit;
+import java.awt.image.BufferedImage;
+import java.io.FileWriter;
+import java.io.IOException;
+
+import tsg.ttt.main.Game;
+import tsg.ttt.main.Handler;
+import tsg.ttt.main.control.keyboard.KeyManager;
+import tsg.ttt.main.gfx.Assets;
+import tsg.ttt.main.ui.*;
+import tsg.ttt.main.ui.particles.blackParticle;
+import tsg.ttt.main.ui.particles.coinParticle;
+import tsg.ttt.main.ui.particles.explosionParticle;
+import tsg.ttt.main.ui.particles.greenParticle;
+import tsg.ttt.main.ui.particles.greenParticleVortex;
+import tsg.ttt.main.ui.particles.laserBeam;
+import tsg.ttt.main.utils.GoodPlayer;
+
+public class GameState extends State{
+	
+	private UIManager uiManager;
+	Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+	UIImageButton tl,tm,tr,ml,mm,mr,bl,bm,br,playAgain,counter;
+	UIImageButton[][] buttons = {{tl,tm,tr},{ml,mm,mr},{bl,bm,br}};
+	boolean[] cUsed = new boolean[2];
+	boolean countering = false, countered = false, failed = false, rCountered = false;
+	int[] previousPlay = new int[2];
+	int CurrentPlayer = 1;
+	int rX, rY;
+	int l,L;
+	int[] moveD;
+	UITiltImage tie;
+	int[][] boardLayout = new int[3][3];
+	UIImagePiece[][] boardPieces = new UIImagePiece[3][3];
+	float pX, pY, pH, pW, pXs, pYs, pWidth;
+	boolean done = false;
+	String winAnim = "bomb";
+	String[] Anims = {"fire", "spiral", "default", "bomb", "embers", "fallen"};
+	
+	int time = 0, timeP = 0, cpuThink = 0, timeB = 0, timeBL = 0;
+	
+	public int getCurrentPlayer() {
+		return CurrentPlayer;
+	}
+
+	public void setCurrentPlayer(int currentPlayer) {
+		CurrentPlayer = currentPlayer;
+	}
+
+	KeyManager keyManager = handler.getKeyManager();
+	int timeEsc = 0;
+	
+	public GameState(Handler handler) {
+		super(handler);
+		init();
+	}
+
+	UIImage board, bar, bZone, coins;
+	float bZoneOffset, bZoneVel = 15;
+	laserBeam main, left, right;
+	
+	coinParticle lastCoin;
+
+	int timeC = 0;
+	
+	BufferedImage[] piece;
+	BufferedImage[] winPiece = {Assets.wx, Assets.wo};
+	
+	public void init() {
+		FileWriter writer;
+		try {
+			writer = new FileWriter("docs/userdata.txt", false);
+			writer.write(Integer.toString(Game.getGold())+"\n");
+			for (int i = 0; i < 8; i++) 
+				writer.write(Boolean.toString(Game.getPurchases()[i])+"\n");
+			writer.write(Game.getActiveSkin()+"\n");
+			writer.write(Game.getActiveAnim()+"\n");
+		    writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		winAnim = Game.getActiveAnim();
+		cUsed = new boolean[2];
+		time = 0;
+		done = false;
+		for(int i = 0; i < 3; i++) {
+			for(int I = 0; I < 3; I++) {
+				boardLayout[i][I] = 0;
+				boardPieces[i][I] = null;
+			}
+		}
+		CurrentPlayer = 1;
+		timeEsc = 0;
+		timeC = 0;
+		uiManager = new UIManager(handler);
+		handler.getMouseManager().setUIManager(uiManager);
+		coins = new UIImage(16, 16, 64, 64, Assets.coin);
+		uiManager.addObject(coins);
+		board = new UIImage(screenSize.width/2-345, screenSize.height/2-345, 690, 690, Assets.board);
+		piece = new BufferedImage[]{Assets.x, Assets.o};
+		uiManager.addObject(board);
+		bar = new UIImage(screenSize.width/2-500, (int)(screenSize.height/10*8.8)-40, 1000, 60, Assets.bar);
+		uiManager.addObject(bar);
+		bar.setShown(false);
+		bZone = new UIImage(screenSize.width/2-39, (int)(screenSize.height/10*8.8)-62, 78, 104, Assets.bZone);
+		uiManager.addObject(bZone);
+		bZone.setShown(false);
+		//Makes the SHOP button
+		uiManager.addObject(new UIImageButton(30, screenSize.height/20*19-36, 216, 72, Assets.shop, new ClickListener(){
+
+			public void onClick() {
+				if(done)
+					Game.playMain();
+				State.setState(handler.getGame().shopState);
+			}}, true));
+		//Makes the counter button
+		counter = new UIImageButton(screenSize.width/2-(int)(47*4.5), (int)(screenSize.height/10*9.6)-36, 47*9, 72, Assets.counter, new ClickListener(){
+			public void onClick() {
+				if (boardPieces[previousPlay[0]][previousPlay[1]] != null) {
+					if(!countering) {
+						Game.stopSound();
+						Game.playZaWarudo();
+						cUsed[CurrentPlayer-1] = true;
+						countering = true;
+					} else if (countering) {
+						Game.playZero();
+						rCountered = true;
+						countering = false;
+						bZone.setShown(false);
+						bar.setShown(false);
+						System.out.println(bZoneOffset);
+						if ((int)(Math.random()*250.0+100) > Math.abs((int)bZoneOffset)) {
+							countered = true;
+						} else {
+							failed = true;
+						}
+					}
+					if (countered) {
+						boardLayout[previousPlay[0]][previousPlay[1]] = getCurrentPlayer();
+						UIImagePiece counterPiece = new UIImagePiece(screenSize.width/2-345+245*previousPlay[0], screenSize.height/2-345+245*previousPlay[1], 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+						boardPieces[previousPlay[0]][previousPlay[1]].setActive(false);
+						boardPieces[previousPlay[0]][previousPlay[1]] = counterPiece;
+						uiManager.addObject(counterPiece);
+						
+						//Changes the player
+						setCurrentPlayer(-getCurrentPlayer()+3);
+						countered = false;
+					} else if (failed) {
+						setCurrentPlayer(-getCurrentPlayer()+3);
+						failed = false;
+					}
+				}
+			}}, true);
+		counter.setShown(false);
+		uiManager.addObject(counter);
+		
+		//Makes the Play Again Button
+		playAgain = new UIImageButton(screenSize.width/10*8-235, (int)(screenSize.height/10*9.5)-30, 470, 60, Assets.playAgain, new ClickListener(){
+			public void onClick() {
+				if(done)
+					Game.playMain();
+				for(int i = 0; i < 3; i++) {
+					for(int I = 0; I < 3; I++) {
+						if (boardPieces[i][I] != null && !boardPieces[i][I].isWinningPiece()) {
+							boardPieces[i][I].stopRot();
+						}
+					}
+				}
+				board.stopRot();
+				handler.getMouseManager().setUIManager(null);
+				init();
+			}}, true);
+		uiManager.addObject(playAgain);
+		
+		//Makes all 9 tile buttons in order from top left to bottom right
+		tl = new UIImageButton(screenSize.width/2-345, screenSize.height/2-345, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					//Places a piece
+					previousPlay[0] = 0;
+					previousPlay[1] = 0;
+					boardLayout[0][0] = getCurrentPlayer();
+					UIImagePiece leftTop = new UIImagePiece(screenSize.width/2-345, screenSize.height/2-345, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[0][0] = leftTop;
+					uiManager.addObject(leftTop);
+ 
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(tl);
+		tm = new UIImageButton(screenSize.width/2-100, screenSize.height/2-345, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					previousPlay[0] = 1;
+					previousPlay[1] = 0;
+					boardLayout[1][0] = getCurrentPlayer();
+					UIImagePiece midTop = new UIImagePiece(screenSize.width/2-100, screenSize.height/2-345, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[1][0] = midTop;
+					uiManager.addObject(midTop);
+ 
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(tm);
+		tr = new UIImageButton(screenSize.width/2+145, screenSize.height/2-345, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					previousPlay[0] = 2;
+					previousPlay[1] = 0;
+					boardLayout[2][0] = getCurrentPlayer();
+					UIImagePiece rightTop = new UIImagePiece(screenSize.width/2+145, screenSize.height/2-345, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[2][0] = rightTop;
+					uiManager.addObject(rightTop);
+ 
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(tr);
+		ml = new UIImageButton(screenSize.width/2-345, screenSize.height/2-100, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					previousPlay[0] = 0;
+					previousPlay[1] = 1;
+					boardLayout[0][1] = getCurrentPlayer();
+					UIImagePiece leftMid = new UIImagePiece(screenSize.width/2-345, screenSize.height/2-100, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[0][1] = leftMid;
+					uiManager.addObject(leftMid);
+ 
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(ml);
+		mm = new UIImageButton(screenSize.width/2-100, screenSize.height/2-100, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					previousPlay[0] = 1;
+					previousPlay[1] = 1;
+					boardLayout[1][1] = getCurrentPlayer();
+					UIImagePiece midMid = new UIImagePiece(screenSize.width/2-100, screenSize.height/2-100, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[1][1] = midMid;
+					uiManager.addObject(midMid);
+ 
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(mm);
+		mr = new UIImageButton(screenSize.width/2+145, screenSize.height/2-100, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					previousPlay[0] = 2;
+					previousPlay[1] = 1;
+					boardLayout[2][1] = getCurrentPlayer();
+					UIImagePiece rightMid = new UIImagePiece(screenSize.width/2+145, screenSize.height/2-100, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[2][1] = rightMid;
+					uiManager.addObject(rightMid);
+ 
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(mr);
+		bl = new UIImageButton(screenSize.width/2-345, screenSize.height/2+145, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					previousPlay[0] = 0;
+					previousPlay[1] = 2;
+					boardLayout[0][2] = getCurrentPlayer();
+					UIImagePiece leftBot = new UIImagePiece(screenSize.width/2-345, screenSize.height/2+145, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[0][2] = leftBot;
+					uiManager.addObject(leftBot);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(bl);
+		bm = new UIImageButton(screenSize.width/2-100, screenSize.height/2+145, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					previousPlay[0] = 1;
+					previousPlay[1] = 2;
+					boardLayout[1][2] = getCurrentPlayer();
+					UIImagePiece midBot = new UIImagePiece(screenSize.width/2-100, screenSize.height/2+145, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[1][2] = midBot;
+					uiManager.addObject(midBot);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(bm);
+		br = new UIImageButton(screenSize.width/2+145, screenSize.height/2+145, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					Game.setGold(Game.getGold()+1);
+					if (lastCoin != null)
+						lastCoin.setActive(false);
+					previousPlay[0] = 2;
+					previousPlay[1] = 2;
+					boardLayout[2][2] = getCurrentPlayer();
+					UIImagePiece rightBot = new UIImagePiece(screenSize.width/2+145, screenSize.height/2+145, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[2][2] = rightBot;
+					uiManager.addObject(rightBot);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(br);
+		buttons = new UIImageButton[][]{{tl,tm,tr},{ml,mm,mr},{bl,bm,br}};
+	}
+	
+	//Revenge of the Getters and Setters
+	public boolean isDone() {
+		return done;
+	}
+
+	public void setDone(boolean done) {
+		this.done = done;
+	}
+
+	public void tick() {
+		//Nonsense that makes the counter bar stop after ~20 seconds
+		counter.setShown(false);
+		if(countering && !rCountered) {
+			timeC++;
+		}
+		if (timeC > 1200) {
+			rCountered = true;
+			countering = false;
+			bZone.setShown(false);
+			bar.setShown(false);
+			failed = true;
+			timeC = 0;
+			Game.playZero();
+		}
+		
+		//Most of the games code
+		if (!done) {
+			if ((((CurrentPlayer == 1 && Game.isCpuActive()) || !Game.isCpuActive()) && (!cUsed[CurrentPlayer-1] || countering) && boardLayout[previousPlay[0]][previousPlay[1]] != CurrentPlayer) && Game.isCounterOn()) {
+				counter.setShown(true); //Shows the counter if the player is human and hasnt already countered
+			}
+			if (countering) { //Displays the counter bar and plays noises and prevents the player from clicking on a piece in the meanwhile
+				bZone.setShown(true);
+				bar.setShown(true);
+				if (Math.abs(bZoneOffset)<500)
+					bZoneOffset+=bZoneVel*(4*(500-Math.abs(bZoneOffset)+1)/500);
+				else
+					bZoneOffset+=bZoneVel*(4/500); 
+				if (Math.abs(bZoneOffset) > 500) {
+					if (timeBL == 0)	
+						timeBL = (int)(Math.random()*30);
+					else 
+						timeB++;
+					if (timeB > timeBL) {
+						System.out.println(bZoneVel);
+						bZoneVel = (float) (-(bZoneVel%2)*(Math.abs(bZoneVel)+2));
+						bZoneOffset = Math.round(bZoneOffset)/500*499;
+						timeB = 0;
+						timeBL = 0;
+					}
+				} else {
+					timeB = 0;
+					timeBL = 0;
+				}
+				bZone.setX(screenSize.width/2-39-bZoneOffset);
+			} else {
+				//Stops showing the bar after the counter is done
+				bZoneOffset = 0;
+				bZoneVel = 15;
+				bZone.setShown(false);
+				bar.setShown(false);
+			}
+			//A bunch of different ways to check for a winner
+			for(int i = 0; i < 3; i++) {
+				if(boardLayout[i][0] == boardLayout[i][1] && boardLayout[i][0] == boardLayout[i][2] && boardLayout[i][0] != 0) {
+					if (CurrentPlayer == 1) {
+						Game.playLoss();
+						if (Game.isCpuActive() == false) {
+							Game.setGold(Game.getGold()+20);
+							uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,20));
+						}
+					}
+					else {
+						Game.playVictory();
+						Game.setGold(Game.getGold()+20);
+						uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,20));
+					}
+					for(int I = 0; I < 3; I++) {
+						boardPieces[i][I].setWinningPiece(true);
+						for(int y = 0; y < 40; y++) {
+							if(winAnim == "fire")
+								uiManager.addObject(new greenParticle(boardPieces[i][I].getWidth()/2+boardPieces[i][I].getX(), boardPieces[i][I].getHeight()+boardPieces[i][I].getY(), (float)Math.random()*boardPieces[i][I].getWidth()+boardPieces[i][I].getX(), (float)(Math.random()*boardPieces[i][I].getWidth()+boardPieces[i][I].getY()), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+						}
+					}
+					done = true;
+					for(int y = 0; y < buttons.length; y++) {
+						for(int Y = 0; Y < buttons.length; Y++) {
+							if (buttons[Y][y] != null) 
+								buttons[Y][y].setActive(false);
+						}
+					}
+				}
+				if(boardLayout[0][i] == boardLayout[1][i] && boardLayout[0][i] == boardLayout[2][i] && boardLayout[0][i] != 0) {
+					if (CurrentPlayer == 1) {
+						Game.playLoss();
+						if (Game.isCpuActive() == false) {
+							Game.setGold(Game.getGold()+20);
+							uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,20));
+						}
+					}
+					else {
+						Game.playVictory();
+						Game.setGold(Game.getGold()+20);
+						uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,20));
+					}
+					for(int I = 0; I < 3; I++) {
+						boardPieces[I][i].setWinningPiece(true);
+						for(int y = 0; y < 40; y++) {
+							if(winAnim == "fire")
+								uiManager.addObject(new greenParticle(boardPieces[I][i].getWidth()/2+boardPieces[I][i].getX(), boardPieces[I][i].getHeight()+boardPieces[I][i].getY(), (float)Math.random()*boardPieces[I][i].getWidth()+boardPieces[I][i].getX(), (float)Math.random()*boardPieces[I][i].getWidth()+boardPieces[I][i].getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+						}
+					}
+					done = true;
+					for(int y = 0; y < buttons.length; y++) {
+						for(int Y = 0; Y < buttons.length; Y++) {
+							if (buttons[Y][y] != null) 
+								buttons[Y][y].setActive(false);
+						}
+					}
+				}
+			}
+			if(boardLayout[0][0] == boardLayout[1][1] && boardLayout[0][0] == boardLayout[2][2] && boardLayout[0][0] != 0) {
+				if (CurrentPlayer == 1) {
+					Game.playLoss();
+					if (Game.isCpuActive() == false) {
+						Game.setGold(Game.getGold()+20);
+						uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,20));
+					}
+				}
+				else {
+					Game.playVictory();
+					Game.setGold(Game.getGold()+20);
+					uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,20));
+				}
+				for(int I = 0; I < 3; I++) {
+					boardPieces[I][I].setWinningPiece(true);
+					for(int y = 0; y <= 40; y++) {
+						if(winAnim == "fire")
+							uiManager.addObject(new greenParticle(boardPieces[I][I].getWidth()/2+boardPieces[I][I].getX(), boardPieces[I][I].getHeight()+boardPieces[I][I].getY(), (float)Math.random()*boardPieces[I][I].getWidth()+boardPieces[I][I].getX(), (float)Math.random()*boardPieces[I][I].getWidth()+boardPieces[I][I].getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+					}
+				}
+				done = true;
+				for(int y = 0; y < buttons.length; y++) {
+					for(int Y = 0; Y < buttons.length; Y++) {
+						if (buttons[Y][y] != null) 
+							buttons[Y][y].setActive(false);
+					}
+				}
+			}
+			if(boardLayout[0][2] == boardLayout[1][1] && boardLayout[0][2] == boardLayout[2][0] && boardLayout[0][2] != 0) {
+				if (CurrentPlayer == 1) {
+					Game.playLoss();
+					if (Game.isCpuActive() == false) {
+						Game.setGold(Game.getGold()+20);
+						uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,20));
+					}
+				}
+				else {
+					Game.playVictory();
+					Game.setGold(Game.getGold()+20);
+					uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,20));
+				}
+				for(int I = 0; I < 3; I++) {
+					boardPieces[I][2-I].setWinningPiece(true);
+					for(int y = 0; y < 40; y++) {
+						if(winAnim == "fire")
+							uiManager.addObject(new greenParticle(boardPieces[I][Math.abs(I-2)].getWidth()/2+boardPieces[I][Math.abs(I-2)].getX(), boardPieces[I][Math.abs(I-2)].getHeight()+boardPieces[I][Math.abs(I-2)].getY(), (float)Math.random()*boardPieces[I][Math.abs(I-2)].getWidth()+boardPieces[I][Math.abs(I-2)].getX(), (float)Math.random()*boardPieces[I][2-I].getWidth()+boardPieces[I][Math.abs(I-2)].getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+					}
+				}
+				done = true;
+				for(int y = 0; y < buttons.length; y++) {
+					for(int Y = 0; Y < buttons.length; Y++) {
+						if (buttons[Y][y] != null) 
+							buttons[Y][y].setActive(false);
+					}
+				}
+			}
+			//Checks for a tie and then displays the animation
+			if (!done && boardLayout[0][0] != 0 && boardLayout[1][0] != 0 && boardLayout[2][0] != 0 && boardLayout[0][1] != 0 && boardLayout[1][1] != 0 && boardLayout[2][1] != 0 && boardLayout[0][2] != 0 && boardLayout[1][2] != 0 && boardLayout[2][2] != 0) {
+				CurrentPlayer = 1;
+				if (time == 0) {
+					Game.setGold(Game.getGold()+10);
+					tie = new UITiltImage(screenSize.width/2-230, screenSize.height/10*4-920, 460, 240, Assets.tie, 0.05, 0.00075);
+					uiManager.addObject(tie);
+				}
+				if (time < 160) {
+					tie.setY(tie.getY()+5);
+				}
+				for(int y = 0; y < 2; y++) {
+					uiManager.addObject(new blackParticle((float)Math.random()*board.getWidth()+board.getX(), (float)Math.random()*board.getHeight()+board.getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+				}
+				board.setY(board.getY()+time/5);
+				for(int i = 0; i < 3; i++) {
+					for(int I = 0; I < 3; I++) {
+						boardPieces[i][I].setY(boardPieces[i][I].getY()+time/5);
+					}
+				}
+				if (time > 300) {
+					uiManager.addObject(new coinParticle((int)(Math.random()*400),(int)(Math.random()*100+50),120,40,120,10));
+					handler.getMouseManager().setUIManager(null);
+					init();
+				}
+				time++;
+			}
+			//The computers turn
+			if (Game.isCpuActive() && !done && CurrentPlayer == 2) {
+				for (int i = 0; i < 3; i++) {
+					for (int I = 0; I < 3; I++) {
+						buttons[i][I].setShown(false);
+					}
+				}
+				UIImagePiece idk;
+				cpuThink++;
+				if (cpuThink > 30) {
+					cpuThink = 0;
+					if (Game.isEasyBot() == true) { //Places a piece randomly
+						while (true) {
+							l = (int)(Math.random()*3);
+							L = (int)(Math.random()*3);
+							if (boardPieces[l][L] == null) {
+								previousPlay[0] = l;
+								previousPlay[1] = L;
+								boardLayout[l][L] = getCurrentPlayer();
+								buttons[L][l].setActive(false);
+								idk = new UIImagePiece(screenSize.width/2-345+245*l, screenSize.height/2-345+245*L, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+								boardPieces[l][L] = idk;
+								uiManager.addObject(idk);
+								setCurrentPlayer(-getCurrentPlayer()+3);
+								break;
+							}	
+						}
+					}
+					else if (Game.isEasyBot() == false) { //Calls my AI to pick the best move
+						int[][] newBoard = new int[3][3];
+						System.arraycopy(boardLayout[0], 0, newBoard[0], 0, boardLayout[0].length);
+						System.arraycopy(boardLayout[1], 0, newBoard[1], 0, boardLayout[1].length);
+						System.arraycopy(boardLayout[2], 0, newBoard[2], 0, boardLayout[2].length);
+						moveD = GoodPlayer.makeAPlay(newBoard);
+						int l = moveD[0];
+						int L = moveD[1];
+						if (boardPieces[l][L] == null) {
+							previousPlay[0] = l;
+							previousPlay[1] = L;
+							boardLayout[l][L] = getCurrentPlayer();
+							buttons[L][l].setActive(false);
+							idk = new UIImagePiece(screenSize.width/2-345+245*l, screenSize.height/2-345+245*L, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+							boardPieces[l][L] = idk;
+							uiManager.addObject(idk);
+							setCurrentPlayer(-getCurrentPlayer()+3);
+						}	
+					}
+				}
+			} else if (countering) { //Stops the buttons from showing up if the player is countering
+				for (int i = 0; i < 3; i++) {
+					for (int I = 0; I < 3; I++) {
+						buttons[i][I].setShown(false);
+					}
+				}
+			} else {
+				for (int i = 0; i < 3; i++) {
+					for (int I = 0; I < 3; I++) {
+						buttons[i][I].setShown(true);
+					}
+				}
+			}
+		} else { //The winning animations mostly
+			if (winAnim.contentEquals("bomb")) { //Looks like an explosion after some shaking
+				if (CurrentPlayer == 2) {
+					if (time < 110 && time > 80) {
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null && boardPieces[i][I].isWinningPiece()) {
+									boardPieces[i][I].setShown(true);
+									boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()-20);
+									boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()-20);
+									boardPieces[i][I].setX(boardPieces[i][I].getX()+10);
+									boardPieces[i][I].setY(boardPieces[i][I].getY()+10);
+								}
+							}
+						}
+					} else if (time == 110) {
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null && !boardPieces[i][I].isWinningPiece()) {
+									boardPieces[i][I].setActive(false);
+								} else if (boardPieces[i][I] != null){
+									boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()-20);
+									boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()-20);
+									boardPieces[i][I].setX(screenSize.width/2-boardPieces[i][I].getWidth()/2);
+									boardPieces[i][I].setY(screenSize.height/2-boardPieces[i][I].getHeight()/2);
+								}
+							}
+						}
+						for (int i = 0; i < 100; i++) {
+							pX = screenSize.width/2;
+							pY = screenSize.height/2;
+							pWidth = (int)(Math.random()*50);
+							pW = (float) (Math.random()*screenSize.width);
+							pH = (float) (Math.random()*screenSize.height);
+							pYs = (pY-pH)/300;
+							pXs = (pX-pW)/300;
+							uiManager.addObject(new explosionParticle(pX-pWidth/2, pY-pWidth/2, (int)pWidth, (int)(Math.random()*100), 300, pXs, pYs));
+						}
+						board.setActive(false);
+					}
+				} else {
+					if (time < 540 && time > 510) {
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null && boardPieces[i][I].isWinningPiece()) {
+									boardPieces[i][I].setShown(true);
+									boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()-20);
+									boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()-20);
+									boardPieces[i][I].setX(boardPieces[i][I].getX()+10);
+									boardPieces[i][I].setY(boardPieces[i][I].getY()+10);
+								}
+							}
+						}
+					} else if (time == 550) {
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null && !boardPieces[i][I].isWinningPiece()) {
+									boardPieces[i][I].setActive(false);
+								} else if (boardPieces[i][I] != null){
+									boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()-20);
+									boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()-20);
+									boardPieces[i][I].setX(screenSize.width/2-boardPieces[i][I].getWidth()/2);
+									boardPieces[i][I].setY(screenSize.height/2-boardPieces[i][I].getHeight()/2);
+								}
+							}
+						}
+						for (int i = 0; i < 100; i++) {
+							pX = screenSize.width/2;
+							pY = screenSize.height/2;
+							pWidth = (int)(Math.random()*50);
+							pW = (float) (Math.random()*screenSize.width);
+							pH = (float) (Math.random()*screenSize.height);
+							pYs = (pY-pH)/300;
+							pXs = (pX-pW)/300;
+							uiManager.addObject(new explosionParticle(pX-pWidth/2, pY-pWidth/2, (int)pWidth, (int)(Math.random()*100), 300, pXs, pYs));
+						}
+						board.setActive(false);
+					}
+				}
+			} else if (winAnim == "fallen") { //Looks like an laser light show after some shaking
+				if (CurrentPlayer == 2) {
+					if (time%10 == 0) {
+						int laserW = (int)(screenSize.width*0.05+screenSize.width*0.1*Math.random());
+						int laserH = (int)(screenSize.width*2.5);
+						uiManager.addObject(new laserBeam((float)(Math.random()*screenSize.width-laserW/2),(float)(Math.random()*screenSize.height-laserH/2), laserW, laserH,0,2*Math.atan2(Math.random()*screenSize.width, Math.random()*screenSize.height)));
+					}
+					if (time < 200 && time > 90) {
+						board.setY(board.getY()+(int)(8.9*(time-30)/60*(time-30)/60));
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null && !boardPieces[i][I].isWinningPiece())
+									boardPieces[i][I].setY(boardPieces[i][I].getY()+(int)(8.9*(time-80)/60*(time-80)/60));
+							}
+						}
+					}
+					if (time > 90 && time < 120) {
+						board.setX((float) (board.getX()+(time%10-4.5f)*Math.ceil(time/220.0)));
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null && boardPieces[i][I].isWinningPiece()) {
+									if (time < 105) {
+										boardPieces[i][I].setWidth((int) (boardPieces[i][I].getWidth()*1.1));
+										boardPieces[i][I].setHeight((int) (boardPieces[i][I].getHeight()*1.1));
+									}
+									boardPieces[i][I].setX(boardPieces[i][I].getX()-(boardPieces[i][I].getX()+boardPieces[i][I].getWidth()/2-screenSize.width/2)/3);
+									boardPieces[i][I].setY(boardPieces[i][I].getY()-(boardPieces[i][I].getY()+boardPieces[i][I].getHeight()/2-screenSize.height/2)/3);
+								}
+							}
+						}
+					} 
+					if (time < 90) {
+						board.setX((float) (board.getX()+(time%10-4.5f)*Math.ceil(time/220.0)));
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null)
+									boardPieces[i][I].setX((float) (boardPieces[i][I].getX()+(time%10-4.5f)*Math.ceil(time/220.0)));
+							}
+						}
+					}
+				} else {
+					if ((time%50 == 0 && time < 550) || (time%10 == 0 && time >= 550)) {
+						int laserW = (int)(screenSize.width*0.05+screenSize.width*0.1*Math.random());
+						int laserH = (int)(screenSize.width*2.5);
+						uiManager.addObject(new laserBeam((float)(Math.random()*screenSize.width-laserW/2),(float)(Math.random()*screenSize.height-laserH/2), laserW, laserH,0,2*Math.atan2(Math.random()*screenSize.width, Math.random()*screenSize.height)));
+					}
+					if (time < 550 && time > 440) {
+						board.setY(board.getY()+(int)(8.9*(time-380)/60*(time-380)/60));
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null && !boardPieces[i][I].isWinningPiece())
+									boardPieces[i][I].setY(boardPieces[i][I].getY()+(int)(8.9*(time-430)/60*(time-430)/60));
+							}
+						}
+					} if (time > 440 && time < 470) {
+						board.setX((float) (board.getX()+(time%10-4.5f)*Math.ceil(time/220.0)));
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null && boardPieces[i][I].isWinningPiece()) {
+									if (time < 455) {
+										boardPieces[i][I].setWidth((int) (boardPieces[i][I].getWidth()*1.1));
+										boardPieces[i][I].setHeight((int) (boardPieces[i][I].getHeight()*1.1));
+									}
+									boardPieces[i][I].setX(boardPieces[i][I].getX()-(boardPieces[i][I].getX()+boardPieces[i][I].getWidth()/2-screenSize.width/2)/3);
+									boardPieces[i][I].setY(boardPieces[i][I].getY()-(boardPieces[i][I].getY()+boardPieces[i][I].getHeight()/2-screenSize.height/2)/3);
+								}
+							}
+						}
+					} 
+					if (time < 440) {
+						board.setX((float) (board.getX()+(time%10-4.5f)*Math.ceil(time/110.0)));
+						for(int i = 0; i < 3; i++) {
+							for(int I = 0; I < 3; I++) {
+								if (boardPieces[i][I] != null)
+									boardPieces[i][I].setX((float)(boardPieces[i][I].getX()+(time%10-4.5f)*Math.ceil(time/110.0)));
+							}
+						}
+					}
+				}
+			}
+			for(int i = 0; i < 3; i++) {
+				for(int I = 0; I < 3; I++) {
+					if (time%2==0) {
+						if (i == 0 && I == 0)
+							rX = (int) (Math.random()*20);
+						if (i == 0 && I == 0)
+							rY = (int) (Math.random()*20);
+					}
+					if (boardPieces[i][I] != null && boardPieces[i][I].isWinningPiece()) {
+						if (timeP >= 15) {
+							if (winAnim.equals("fire")) { //Yay! Particles!
+								uiManager.addObject(new greenParticle(boardPieces[i][I].getWidth()/2+boardPieces[i][I].getX(), boardPieces[i][I].getHeight()+boardPieces[i][I].getY(), (float)Math.random()*boardPieces[i][I].getWidth()+boardPieces[i][I].getX(), (float)(Math.random()*boardPieces[i][I].getWidth()+boardPieces[i][I].getY()), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+							}
+						}
+						if (winAnim.equals("bomb")) { //Shakes things 
+							if (time%2==0) {
+								boardPieces[i][I].setX(boardPieces[i][I].getX()-rX);
+								boardPieces[i][I].setY(boardPieces[i][I].getY()-rY);
+								boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()+rX*2);
+								boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()+rY*2);
+							} else {
+								boardPieces[i][I].setX(boardPieces[i][I].getX()+rX);
+								boardPieces[i][I].setY(boardPieces[i][I].getY()+rY);
+								boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()-rX*2);
+								boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()-rY*2);
+							}
+						} else if (!winAnim.equals("fallen")){
+							if (time < 90 && CurrentPlayer == 2) { //Shakes things 
+								boardPieces[i][I].setX(boardPieces[i][I].getX()-(45-time)/2);
+								boardPieces[i][I].setY(boardPieces[i][I].getY()-(45-time)/2);
+								boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()+(45-time));
+								boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()+(45-time));
+							} else if (time < 550 && CurrentPlayer == 1) {
+								boardPieces[i][I].setX(boardPieces[i][I].getX()-(275-time)/20);
+								boardPieces[i][I].setY(boardPieces[i][I].getY()-(275-time)/20);
+								boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()+(int)((275-time)/10));
+								boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()+(int)((275-time)/10));
+							}
+						}
+					}
+				}
+			}
+			if (timeP%5 == 0) {
+				if (winAnim.equals("spiral")) { // Makes a particle vortex
+					pX = screenSize.width/2;
+					pY = screenSize.height/2;
+					pW = (float) (Math.random()*screenSize.width);
+					pH = (float) (Math.random()*screenSize.height);
+					pYs = (pH-pY)/300;
+					pXs = (pW-pX)/300;
+					uiManager.addObject(new greenParticleVortex(pX, pY, pW, pH, (int)(Math.random()*5), (int)(Math.random()*20), 300, pXs, pYs));
+					uiManager.addObject(new greenParticleVortex(pX, pY, screenSize.width-pW, screenSize.height-pH, (int)(Math.random()*5), (int)(Math.random()*20), 300, (screenSize.width-pW-pX)/300, (screenSize.height-pH-pY)/300));
+				} else if (winAnim.equals("embers")) { //Makes a wierd messed up version of the particle vortex that I'm going to pretend I made on purpose
+					pX = screenSize.width/2;
+					pY = screenSize.height/2;
+					pW = (float) (Math.random()*screenSize.width);
+					pH = (float) (Math.random()*screenSize.height);
+					pYs = (pH-pY)/300;
+					pXs = (pW-pX)/300;
+					uiManager.addObject(new greenParticleVortex(pW, pH, pW, pH, (int)(Math.random()*5), (int)(Math.random()*100), 300, -pXs, -pYs));
+				} else if (winAnim.equals("bomb")) { //Makes another particle vortex because I thought it looked cool
+					pX = screenSize.width/2;
+					pY = screenSize.height/2;
+					pW = (float) (Math.random()*screenSize.width);
+					pH = (float) (Math.random()*screenSize.height);
+					pYs = (pH-pY)/300;
+					pXs = (pW-pX)/300;
+					uiManager.addObject(new greenParticleVortex(pX, pY, pW, pH, (int)(Math.random()*5), (int)(Math.random()*20), 300, pXs, pYs));
+					uiManager.addObject(new greenParticleVortex(pX, pY, screenSize.width-pW, screenSize.height-pH, (int)(Math.random()*5), (int)(Math.random()*20), 300, (screenSize.width-pW-pX)/300, (screenSize.height-pH-pY)/300));
+				}
+				else if (winAnim.equals("default")) { //is Lame (Default particles)
+					uiManager.addObject(new blackParticle((float)Math.random()*screenSize.width, screenSize.height+100, (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f*0.3f, (float)Math.random()*1.3f*1.3f));		
+				}
+			}
+			if (winAnim.equals("spiral") && time > 90) { //Makes the pieces dance
+				board.doRot();
+				board.setX(board.getX()+6);
+				board.setY(board.getY()+6);
+				board.setWidth(board.getWidth()-12);
+				board.setHeight(board.getHeight()-12);
+				if(board.getWidth()<0)
+					board.setActive(false);
+				for(int i = 0; i < 3; i++) {
+					for(int I = 0; I < 3; I++) {
+						if (boardPieces[i][I] != null && !boardPieces[i][I].isWinningPiece()) {
+							boardPieces[i][I].doRot();
+							boardPieces[i][I].setX(board.getX()+(board.getWidth()/3*(i)+board.getWidth()/23));
+							boardPieces[i][I].setY(board.getY()+(board.getHeight()/3*(I)+board.getHeight()/23));
+							boardPieces[i][I].setWidth(boardPieces[i][I].getWidth()-4);
+							boardPieces[i][I].setHeight(boardPieces[i][I].getHeight()-4);
+							if(boardPieces[i][I].getWidth()<0)
+								boardPieces[i][I].setActive(false);
+						}
+					}
+				}
+			}
+			if (timeP >= 15)
+				timeP = 0;
+			playAgain.setShown(true);
+			timeP++;
+			time++;
+		}
+		timeEsc++;
+		if (keyManager.esc == true && timeEsc > 10) { //Goes back to menu
+			for(int i = 0; i < 3; i++) {
+				for(int I = 0; I < 3; I++) {
+					if (boardPieces[i][I] != null && !boardPieces[i][I].isWinningPiece()) {
+						boardPieces[i][I].stopRot();
+					}
+				}
+			}
+			board.stopRot();
+			if(done)
+				Game.playMain();
+			State.setState(handler.getGame().menuState);
+		}
+		//Ticks the UI
+		uiManager.tick();
+	}
+
+	public void render(Graphics g) { //Renders everything
+		Font font = new Font("Serif", Font.PLAIN, 80);
+		g.setFont(font);
+		g.setColor(Color.black);
+		g.drawString(Integer.toString(Game.getGold()), 94, 72);
+		uiManager.render(g);
+	}
+}

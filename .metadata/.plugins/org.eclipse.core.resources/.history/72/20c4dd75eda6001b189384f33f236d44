@@ -1,0 +1,59 @@
+package tsg.ttt.main.ui.particles;
+
+import java.awt.AlphaComposite;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
+
+import tsg.ttt.main.gfx.Assets;
+import tsg.ttt.main.ui.UIManager;
+import tsg.ttt.main.ui.UIObject;
+
+public class laserBeam extends UIObject{ //Big Ol' Laser that quickly expands and fizzles out before disappearing
+	
+	int size, lifetime, spRate, time = 0;
+	double rot;
+	int lifetimeC = 1;
+	public int getLifetime() {
+		return lifetime;
+	}
+
+	public void setLifetime(int lifetime) {
+		this.lifetime = lifetime;
+	}
+
+	UIManager uiManager;
+	
+	public laserBeam(float x, float y, int width, int height, int lifetime, double rot) {
+		super(x, y, width, height, true);
+		this.lifetime = lifetime;
+		this.rot = rot;
+	}
+	
+	public void tick() {
+		if (lifetime > 27) 
+			lifetimeC = -1;
+		else if (lifetime < 0)
+			active = false;
+		lifetime+=lifetimeC;
+	}
+
+	public void render(Graphics g) {
+		Graphics2D g2d = (Graphics2D) g;
+		AffineTransform backup = g2d.getTransform();
+		AffineTransform trans = new AffineTransform();
+		trans.rotate(rot, x+width/2, y+height/2);
+		g2d.transform(trans);
+		AlphaComposite composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f);
+		g2d.setComposite(composite);
+		g2d.drawImage(Assets.beam[lifetime/3],(int)x,(int)y,width,height,null);
+		composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1);
+		g2d.setComposite(composite);
+		g2d.setTransform(backup); 
+	}
+
+	public void onClick() {}
+	
+	
+	
+}

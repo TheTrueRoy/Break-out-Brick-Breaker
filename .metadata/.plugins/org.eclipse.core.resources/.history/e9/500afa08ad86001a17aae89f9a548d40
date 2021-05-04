@@ -1,0 +1,311 @@
+package tsg.ttt.main.states;
+
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Toolkit;
+import java.awt.image.BufferedImage;
+
+import tsg.ttt.main.Game;
+import tsg.ttt.main.Handler;
+import tsg.ttt.main.control.keyboard.KeyManager;
+import tsg.ttt.main.gfx.Assets;
+import tsg.ttt.main.ui.*;
+import tsg.ttt.main.ui.particles.blackParticle;
+import tsg.ttt.main.ui.particles.greenParticle;
+
+public class GameState extends State{
+	
+	private UIManager uiManager;
+	Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+	UIImageButton tl,tm,tr,ml,mm,mr,bl,bm,br,playAgain;
+	UIImageButton[][] buttons = {{tl,tm,tr},{ml,mm,mr},{bl,bm,br}};
+	int CurrentPlayer = 1;
+	int l,L;
+	UITiltImage tie;
+	int[][] boardLayout = new int[3][3];
+	UIImagePiece[][] boardPieces = new UIImagePiece[3][3];
+	boolean done = false;
+	
+	int time = 0;
+	
+	public int getCurrentPlayer() {
+		return CurrentPlayer;
+	}
+
+	public void setCurrentPlayer(int currentPlayer) {
+		CurrentPlayer = currentPlayer;
+	}
+
+	KeyManager keyManager = handler.getKeyManager();
+	int timeEsc = 0;
+	
+	public GameState(Handler handler) {
+		super(handler);
+		init();
+	}
+
+	UIImage board;
+
+	BufferedImage[] piece = {Assets.x, Assets.o};
+	BufferedImage[] winPiece = {Assets.wx, Assets.wo};
+	
+	public void init() {
+		time = 0;
+		done = false;
+		for(int i = 0; i < 3; i++) {
+			for(int I = 0; I < 3; I++) {
+				boardLayout[i][I] = 0;
+				boardPieces[i][I] = null;
+			}
+		}
+		CurrentPlayer = 1;
+		timeEsc = 0;
+		uiManager = new UIManager(handler);
+		handler.getMouseManager().setUIManager(uiManager);
+		board = new UIImage(screenSize.width/2-345, screenSize.height/2-345, 690, 690, Assets.board);
+		uiManager.addObject(board);
+		playAgain = new UIImageButton(screenSize.width/2-235, screenSize.height/10*9-30, 470, 60, Assets.playAgain, new ClickListener(){
+			public void onClick() {
+				handler.getMouseManager().setUIManager(null);
+				init();
+			}}, true);
+		uiManager.addObject(playAgain);
+		playAgain.setShown(false);
+		tl = new UIImageButton(screenSize.width/2-345, screenSize.height/2-345, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[0][0] = getCurrentPlayer();
+					UIImagePiece leftTop = new UIImagePiece(screenSize.width/2-345, screenSize.height/2-345, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[0][0] = leftTop;
+					uiManager.addObject(leftTop);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(tl);
+		tm = new UIImageButton(screenSize.width/2-100, screenSize.height/2-345, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[1][0] = getCurrentPlayer();
+					UIImagePiece midTop = new UIImagePiece(screenSize.width/2-100, screenSize.height/2-345, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[1][0] = midTop;
+					uiManager.addObject(midTop);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(tm);
+		tr = new UIImageButton(screenSize.width/2+145, screenSize.height/2-345, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[2][0] = getCurrentPlayer();
+					UIImagePiece rightTop = new UIImagePiece(screenSize.width/2+145, screenSize.height/2-345, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[2][0] = rightTop;
+					uiManager.addObject(rightTop);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(tr);
+		ml = new UIImageButton(screenSize.width/2-345, screenSize.height/2-100, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[0][1] = getCurrentPlayer();
+					UIImagePiece leftMid = new UIImagePiece(screenSize.width/2-345, screenSize.height/2-100, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[0][1] = leftMid;
+					uiManager.addObject(leftMid);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(ml);
+		mm = new UIImageButton(screenSize.width/2-100, screenSize.height/2-100, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[1][1] = getCurrentPlayer();
+					UIImagePiece midMid = new UIImagePiece(screenSize.width/2-100, screenSize.height/2-100, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[1][1] = midMid;
+					uiManager.addObject(midMid);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(mm);
+		mr = new UIImageButton(screenSize.width/2+145, screenSize.height/2-100, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[2][1] = getCurrentPlayer();
+					UIImagePiece rightMid = new UIImagePiece(screenSize.width/2+145, screenSize.height/2-100, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[2][1] = rightMid;
+					uiManager.addObject(rightMid);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(mr);
+		bl = new UIImageButton(screenSize.width/2-345, screenSize.height/2+145, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[0][2] = getCurrentPlayer();
+					UIImagePiece leftBot = new UIImagePiece(screenSize.width/2-345, screenSize.height/2+145, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[0][2] = leftBot;
+					uiManager.addObject(leftBot);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(bl);
+		bm = new UIImageButton(screenSize.width/2-100, screenSize.height/2+145, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[1][2] = getCurrentPlayer();
+					UIImagePiece midBot = new UIImagePiece(screenSize.width/2-100, screenSize.height/2+145, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[1][2] = midBot;
+					uiManager.addObject(midBot);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(bm);
+		br = new UIImageButton(screenSize.width/2+145, screenSize.height/2+145, 200, 200, Assets.pos, new ClickListener(){
+			public void onClick() {
+				if (!isDone()) {
+					boardLayout[2][2] = getCurrentPlayer();
+					UIImagePiece rightBot = new UIImagePiece(screenSize.width/2+145, screenSize.height/2+145, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+					boardPieces[2][2] = rightBot;
+					uiManager.addObject(rightBot);
+					setCurrentPlayer(-getCurrentPlayer()+3);
+				}
+			}}, false);
+		uiManager.addObject(br);
+		buttons = new UIImageButton[][]{{tl,tm,tr},{ml,mm,mr},{bl,bm,br}};
+		uiManager.addObject(new UIImageButton(screenSize.width-80, screenSize.height-80, 64, 64, Assets.settings, new ClickListener(){
+
+			public void onClick() {
+				SettingState.setLastState(handler.getGame().gameState);
+				State.setState(handler.getGame().settingState);
+			}}, true));
+	}
+	
+	public boolean isDone() {
+		return done;
+	}
+
+	public void setDone(boolean done) {
+		this.done = done;
+	}
+
+	public void tick() {
+		if (!done) {
+			if (boardLayout[0][0] != 0 && boardLayout[1][0] != 0 && boardLayout[2][0] != 0 && boardLayout[0][1] != 0 && boardLayout[1][1] != 0 && boardLayout[2][1] != 0 && boardLayout[0][2] != 0 && boardLayout[1][2] != 0 && boardLayout[2][2] != 0) {
+				CurrentPlayer = 1;
+				if (time == 0) {
+					tie = new UITiltImage(screenSize.width/2-230, screenSize.height/10*4-920, 460, 240, Assets.tie, 0.05, 0.00075);
+					uiManager.addObject(tie);
+				}
+				if (time < 160) {
+					tie.setY(tie.getY()+5);
+				}
+				for(int y = 0; y < 2; y++) {
+					uiManager.addObject(new blackParticle((float)Math.random()*board.getWidth()+board.getX(), (float)Math.random()*board.getHeight()+board.getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+				}
+				time++;
+				board.setY(board.getY()+time/5);
+				for(int i = 0; i < 3; i++) {
+					for(int I = 0; I < 3; I++) {
+						boardPieces[i][I].setY(boardPieces[i][I].getY()+time/5);
+					}
+				}
+				if (time > 300) {
+					handler.getMouseManager().setUIManager(null);
+					init();
+				}
+			}
+			for(int i = 0; i < 3; i++) {
+				if(boardLayout[i][0] == boardLayout[i][1] && boardLayout[i][0] == boardLayout[i][2] && boardLayout[i][0] != 0) {
+					for(int I = 0; I < 3; I++) {
+						boardPieces[i][I].setWinningPiece(true);
+						for(int y = 0; y < 40; y++) {
+							uiManager.addObject(new greenParticle((float)Math.random()*boardPieces[i][I].getWidth()+boardPieces[i][I].getX(), (float)Math.random()*boardPieces[i][I].getWidth()+boardPieces[i][I].getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+						}
+					}
+					done = true;
+					for(int y = 0; y < buttons.length; y++) {
+						for(int Y = 0; Y < buttons.length; Y++) {
+							if (buttons[Y][y] != null) 
+								buttons[Y][y].setActive(false);
+						}
+					}
+				}
+				if(boardLayout[0][i] == boardLayout[1][i] && boardLayout[0][i] == boardLayout[2][i] && boardLayout[0][i] != 0) {
+					for(int I = 0; I < 3; I++) {
+						boardPieces[I][i].setWinningPiece(true);
+						for(int y = 0; y < 40; y++) {
+							uiManager.addObject(new greenParticle((float)Math.random()*boardPieces[I][i].getWidth()+boardPieces[I][i].getX(), (float)Math.random()*boardPieces[I][i].getWidth()+boardPieces[I][i].getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+						}
+					}
+					done = true;
+					for(int y = 0; y < buttons.length; y++) {
+						for(int Y = 0; Y < buttons.length; Y++) {
+							if (buttons[Y][y] != null) 
+								buttons[Y][y].setActive(false);
+						}
+					}
+				}
+			}
+			if(boardLayout[0][0] == boardLayout[1][1] && boardLayout[0][0] == boardLayout[2][2] && boardLayout[0][0] != 0) {
+				for(int I = 0; I < 3; I++) {
+					boardPieces[I][I].setWinningPiece(true);
+					for(int y = 0; y < 40; y++) {
+						uiManager.addObject(new greenParticle((float)Math.random()*boardPieces[I][I].getWidth()+boardPieces[I][I].getX(), (float)Math.random()*boardPieces[I][I].getWidth()+boardPieces[I][I].getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+					}
+				}
+				done = true;
+					for(int y = 0; y < buttons.length; y++) {
+						for(int Y = 0; Y < buttons.length; Y++) {
+							if (buttons[Y][y] != null) 
+								buttons[Y][y].setActive(false);
+						}
+					}
+			}
+			if(boardLayout[0][2] == boardLayout[1][1] && boardLayout[0][2] == boardLayout[2][0] && boardLayout[0][2] != 0) {
+				for(int I = 0; I < 3; I++) {
+					boardPieces[I][2-I].setWinningPiece(true);
+					for(int y = 0; y < 40; y++) {
+						uiManager.addObject(new greenParticle((float)Math.random()*boardPieces[I][2-I].getWidth()+boardPieces[I][2-I].getX(), (float)Math.random()*boardPieces[I][2-I].getWidth()+boardPieces[I][2-I].getY(), (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f, (float)Math.random()*1.3f));
+					}
+				}
+				done = true;
+				for(int y = 0; y < buttons.length; y++) {
+					for(int Y = 0; Y < buttons.length; Y++) {
+						if (buttons[Y][y] != null) 
+							buttons[Y][y].setActive(false);
+					}
+				}
+			}
+			if (Game.isCpuActive() && !done && CurrentPlayer == 2) {
+				while (true) {
+					l = (int)(Math.random()*3);
+					L = (int)(Math.random()*3);
+					if (boardPieces[l][L] == null) {
+						boardLayout[l][L] = getCurrentPlayer();
+						buttons[L][l].setActive(false);
+						UIImagePiece idk = new UIImagePiece(screenSize.width/2-345+245*l, screenSize.height/2-345+245*L, 200, 200, piece[CurrentPlayer-1], winPiece[CurrentPlayer-1]);
+						boardPieces[l][L] = idk;
+						uiManager.addObject(idk);
+						setCurrentPlayer(-getCurrentPlayer()+3);
+						break;
+					}
+				}
+			}
+		} else {
+			playAgain.setShown(true);
+			time++;
+			if (time >= 3) {
+				uiManager.addObject(new blackParticle((float)Math.random()*screenSize.width, screenSize.height+100, (int)(Math.random()*5), (int)(Math.random()*20), (int)(Math.random()*480+240), (float)Math.random()*0.3f*0.3f, (float)Math.random()*1.3f*1.3f));
+				time = 0;
+			}
+		}
+		timeEsc++;
+		if (keyManager.esc == true && timeEsc > 10) {
+			State.setState(handler.getGame().menuState);
+		}
+		uiManager.tick();
+	}
+
+	public void render(Graphics g) {
+		uiManager.render(g);
+	}
+}

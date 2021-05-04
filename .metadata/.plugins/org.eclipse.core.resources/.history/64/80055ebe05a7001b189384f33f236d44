@@ -1,0 +1,61 @@
+package tsg.ttt.main.ui.particles;
+
+import java.awt.AlphaComposite;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
+
+import tsg.ttt.main.gfx.Assets;
+import tsg.ttt.main.ui.UIManager;
+import tsg.ttt.main.ui.UIObject;
+
+public class brickParticle extends UIObject{ //Black or white particle, has velocity
+	
+	int size, lifetime, spRate, time = 0, health;
+	float xSp, ySp;
+	UIManager uiManager;
+	
+	public brickParticle(float x, float y, int width, int height, int lifetime, float xSp, float ySp, int health) {
+		super(x, y, width, height, 1);
+		this.lifetime = lifetime;
+		this.xSp = xSp;
+		this.ySp = ySp;
+		this.health = health-1;
+	}
+
+	double rot = 0;
+	double rotC = (Math.random()-0.5)/2;
+	int i = (int)(Math.random()*10);
+	double ratio = width/height;
+	
+	public void tick() {
+		if (y > lifetime) {
+			active = false;
+		}
+		if (health < 0) {
+			health = 0;
+		}
+		rotC*=0.95;
+		rot+=rotC;
+		ySp-=0.17;
+		y-=ySp;
+		x-=xSp;
+		height+=1.5;
+		width+=1.5;
+	}
+
+	public void render(Graphics g) {
+		Graphics2D g2d = (Graphics2D) g;
+		AffineTransform backup = g2d.getTransform();
+		AffineTransform trans = new AffineTransform();
+		trans.rotate(rot, x+width/2, y+height/2);
+		g2d.transform(trans);
+		g2d.drawImage(Assets.bricks[health],(int)x,(int)y,width,height, null);
+		g2d.setTransform(backup); 
+	}
+
+	public void onClick() {}
+	
+	
+	
+}
