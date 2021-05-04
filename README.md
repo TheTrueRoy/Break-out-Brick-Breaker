@@ -1,2 +1,2 @@
-# KanyeBot
-A general purpose discord bot designed to meet my friends requests
+# Break-out/Brick Breaker
+Experimental game development project
